@@ -89,7 +89,12 @@ class cyclegan(object):
         self.g_loss_a2b_sum = tf.summary.scalar("g_loss_a2b", self.g_loss_a2b)
         self.g_loss_b2a_sum = tf.summary.scalar("g_loss_b2a", self.g_loss_b2a)
         self.g_loss_sum = tf.summary.scalar("g_loss", self.g_loss)
-        self.g_sum = tf.summary.merge([self.g_loss_a2b_sum, self.g_loss_b2a_sum, self.g_loss_sum])
+        self.g_realA_image_sum = tf.summary.image("realA", self.real_A)
+        self.g_realB_image_sum = tf.summary.image("realB", self.real_B)
+        self.g_fakeA_image_sum_ = tf.summary.image("fakeA", self.fake_A_)
+        self.g_fakeB_image_sum = tf.summary.image("fakeB", self.fake_B)
+        self.g_sum = tf.summary.merge([self.g_loss_a2b_sum, self.g_loss_b2a_sum, self.g_loss_sum,
+            self.g_realA_image_sum, self.g_fakeB_image_sum, self.g_fakeA_image_sum_, self.g_realB_image_sum])
         self.db_loss_sum = tf.summary.scalar("db_loss", self.db_loss)
         self.da_loss_sum = tf.summary.scalar("da_loss", self.da_loss)
         self.d_loss_sum = tf.summary.scalar("d_loss", self.d_loss)
