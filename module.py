@@ -2,7 +2,24 @@ from __future__ import division
 import tensorflow as tf
 from ops import *
 from utils import *
+slim = tf.contrib.slim
 
+def lrelu(x):
+    return tf.maximum(x*0.2,x)
+
+def identity_initializer():
+    def _initializer(shape, dtype=tf.float32, partition_info=None):
+        array = np.zeros(shape, dtype=float)
+        cx, cy = shape[0]//2, shape[1]//2
+        for i in range(shape[2]):
+            array[cx, cy, i, i] = 1
+        return tf.constant(array, dtype=dtype)
+    return _initializer
+
+def nm(x):
+    w0=tf.Variable(1.0,name='w0')
+    w1=tf.Variable(0.0,name='w1')
+    return w0*x+w1*slim.batch_norm(x) # the parameter "is_training" in slim.batch_norm does not seem to help so I do not use it
 
 def discriminator(image, options, reuse=False, name="discriminator"):
 
@@ -25,6 +42,24 @@ def discriminator(image, options, reuse=False, name="discriminator"):
         # h4 is (32 x 32 x 1)
         return h4
 
+def generator_dilation(image, options, reuse=False, name="generator"):
+    dropout_rate = 0.5 if options.is_training else 1.0
+    with tf.variable_scope(name):
+        if reuse:
+            tf.get_variable_scope().reuse_variables()
+        else:
+            assert tf.get_variable_scope().reuse is False
+
+        net=slim.conv2d(image,24,[3,3],rate=1,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv1')
+        net=slim.conv2d(net,24,[3,3],rate=2,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv2')
+        net=slim.conv2d(net,24,[3,3],rate=4,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv3')
+        net=slim.conv2d(net,24,[3,3],rate=8,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv4')
+        net=slim.conv2d(net,24,[3,3],rate=16,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv5')
+        net=slim.conv2d(net,24,[3,3],rate=32,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv6')
+        net=slim.conv2d(net,24,[3,3],rate=64,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv7')
+        net=slim.conv2d(net,24,[3,3],rate=1,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv9')
+        net=slim.conv2d(net,3,[1,1],rate=1,activation_fn=None,scope='g_conv_last')
+        return net
 
 def generator_unet(image, options, reuse=False, name="generator"):
 

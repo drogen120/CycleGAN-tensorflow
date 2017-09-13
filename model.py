@@ -24,7 +24,8 @@ class cyclegan(object):
         if args.use_resnet:
             self.generator = generator_resnet
         else:
-            self.generator = generator_unet
+            # self.generator = generator_unet
+            self.generator = generator_dilation
         if args.use_lsgan:
             self.criterionGAN = mae_criterion
         else:
