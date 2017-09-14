@@ -50,16 +50,17 @@ def generator_dilation(image, options, reuse=False, name="generator"):
         else:
             assert tf.get_variable_scope().reuse is False
 
-        net=slim.conv2d(image,24,[3,3],rate=1,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv1')
-        net=slim.conv2d(net,24,[3,3],rate=2,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv2')
-        net=slim.conv2d(net,24,[3,3],rate=4,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv3')
-        net=slim.conv2d(net,24,[3,3],rate=8,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv4')
-        net=slim.conv2d(net,24,[3,3],rate=16,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv5')
-        net=slim.conv2d(net,24,[3,3],rate=32,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv6')
-        net=slim.conv2d(net,24,[3,3],rate=64,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv7')
-        net=slim.conv2d(net,24,[3,3],rate=1,activation_fn=lrelu,normalizer_fn=nm,weights_initializer=identity_initializer(),scope='g_conv9')
-        net=slim.conv2d(net,3,[1,1],rate=1,activation_fn=None,scope='g_conv_last')
-        return net
+        conv1 = instance_norm(conv2d(image, 24, ks=3, s=1, rate=1, name='g_conv1'), 'g_bn_conv1')
+        conv2 = instance_norm(conv2d(lrelu(conv1), 24, ks=3, s=1, rate=2, name='g_conv2'), 'g_bn_conv2')
+        conv3 = instance_norm(conv2d(lrelu(conv2), 24, ks=3, s=1, rate=4, name='g_conv3'), 'g_bn_conv3')
+        conv4 = instance_norm(conv2d(lrelu(conv3), 24, ks=3, s=1, rate=8, name='g_conv4'), 'g_bn_conv4')
+        conv5 = instance_norm(conv2d(lrelu(conv4), 24, ks=3, s=1, rate=16, name='g_conv5'), 'g_bn_conv5')
+        conv6 = instance_norm(conv2d(lrelu(conv5), 24, ks=3, s=1, rate=32, name='g_conv6'), 'g_bn_conv6')
+        conv7 = instance_norm(conv2d(lrelu(conv6), 24, ks=3, s=1, rate=64, name='g_conv7'), 'g_bn_conv7')
+        conv8 = instance_norm(conv2d(lrelu(conv7), 24, ks=3, s=1, rate=1, name='g_conv8'), 'g_bn_conv8')
+        conv9 = instance_norm(conv2d(lrelu(conv8), 3, ks=1, s=1, rate=1, name='g_conv9'), 'g_bn_conv9')
+        
+        return tf.nn.tanh(conv9)
 
 def generator_unet(image, options, reuse=False, name="generator"):
 
