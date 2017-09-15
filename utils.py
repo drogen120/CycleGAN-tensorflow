@@ -47,12 +47,16 @@ def load_test_data(image_path, fine_size=256):
 def load_train_data(image_path, load_size=640, fine_size=320, is_testing=False):
     img_A = imread(image_path[0])
     img_B = imread(image_path[1])
-    img_A = scipy.misc.imresize(img_A, [640, 360])
-    img_B = scipy.misc.imresize(img_B, [640, 360])
+    img_A = scipy.misc.imresize(img_A, [360, 640])
+    print img_A.shape
+    img_B = scipy.misc.imresize(img_B, [360, 640])
+    print img_B.shape
 
     if not is_testing:
         img_A = random_crop(img_A, fine_size, fine_size)
+        print img_A.shape
         img_B = random_crop(img_B, fine_size, fine_size)
+        print img_B.shape
 
         if np.random.random() > 0.5:
             img_A = np.fliplr(img_A)
