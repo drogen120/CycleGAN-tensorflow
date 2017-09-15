@@ -44,7 +44,7 @@ def load_test_data(image_path, fine_size=256):
     img = img/127.5 - 1
     return img
 
-def load_train_data(image_path, load_size=640, fine_size=448, is_testing=False):
+def load_train_data(image_path, load_size=640, fine_size=320, is_testing=False):
     img_A = imread(image_path[0])
     img_B = imread(image_path[1])
 
