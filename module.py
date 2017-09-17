@@ -58,8 +58,9 @@ def generator_dilation(image, options, reuse=False, name="generator"):
         conv6 = instance_norm(conv2d(lrelu(conv5), 24, ks=3, s=1, rate=32, name='g_conv6'), 'g_bn_conv6')
         conv7 = instance_norm(conv2d(lrelu(conv6), 24, ks=3, s=1, rate=64, name='g_conv7'), 'g_bn_conv7')
         conv8 = instance_norm(conv2d(lrelu(conv7), 24, ks=3, s=1, rate=1, name='g_conv8'), 'g_bn_conv8')
-        conv9 = instance_norm(conv2d(lrelu(conv8), 3, ks=1, s=1, rate=1, name='g_conv9'), 'g_bn_conv9')
-        
+        concate_layer = tf.concat([conv8, conv1], 3, name='g_concate')
+        conv9 = instance_norm(conv2d(lrelu(concate_layer), 3, ks=1, s=1, rate=1, name='g_conv9'), 'g_bn_conv9')
+
         return tf.nn.tanh(conv9)
 
 def generator_unet(image, options, reuse=False, name="generator"):
