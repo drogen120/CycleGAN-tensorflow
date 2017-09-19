@@ -47,13 +47,16 @@ class cyclegan(object):
                                          self.input_c_dim + self.output_c_dim],
                                         name='real_A_and_B_images')
 
-        self.real_A = self.real_data[:, :, :, :self.input_c_dim]
-        self.real_B = self.real_data[:, :, :, self.input_c_dim:self.input_c_dim + self.output_c_dim]
+        self.real_A, self.l_chan_A = preprocess_lab(rgb_to_lab(self.real_data[:, :, :, :self.input_c_dim]))
+        self.real_B, self.l_chan_B = preprocess_lab(rgb_to_lab(self.real_data[:, :, :, self.input_c_dim:self.input_c_dim + self.output_c_dim]))
 
         self.fake_B = self.generator(self.real_A, self.options, False, name="generatorA2B")
         self.fake_A_ = self.generator(self.fake_B, self.options, False, name="generatorB2A")
         self.fake_A = self.generator(self.real_B, self.options, True, name="generatorB2A")
         self.fake_B_ = self.generator(self.fake_A, self.options, True, name="generatorA2B")
+
+        self.output_fakeA = lab_to_rgb(deprocess_lab(self.l_chan_A, self.fake_A))
+        self.output_fakeB = lab_to_rgb(deprocess_lab(self.l_chan_B, self.fake_B))
 
         self.DB_fake = self.discriminator(self.fake_B, self.options, reuse=False, name="discriminatorB")
         self.DA_fake = self.discriminator(self.fake_A, self.options, reuse=False, name="discriminatorA")
@@ -70,10 +73,10 @@ class cyclegan(object):
 
         self.fake_A_sample = tf.placeholder(tf.float32,
                                             [None, self.image_size, self.image_size,
-                                             self.input_c_dim], name='fake_A_sample')
+                                             2], name='fake_A_sample')
         self.fake_B_sample = tf.placeholder(tf.float32,
                                             [None, self.image_size, self.image_size,
-                                             self.output_c_dim], name='fake_B_sample')
+                                             2], name='fake_B_sample')
         self.DB_real = self.discriminator(self.real_B, self.options, reuse=True, name="discriminatorB")
         self.DA_real = self.discriminator(self.real_A, self.options, reuse=True, name="discriminatorA")
         self.DB_fake_sample = self.discriminator(self.fake_B_sample, self.options, reuse=True, name="discriminatorB")
@@ -90,12 +93,12 @@ class cyclegan(object):
         self.g_loss_a2b_sum = tf.summary.scalar("g_loss_a2b", self.g_loss_a2b)
         self.g_loss_b2a_sum = tf.summary.scalar("g_loss_b2a", self.g_loss_b2a)
         self.g_loss_sum = tf.summary.scalar("g_loss", self.g_loss)
-        self.g_realA_image_sum = tf.summary.image("realA", self.real_A)
-        self.g_realB_image_sum = tf.summary.image("realB", self.real_B)
-        self.g_fakeA_image_sum_ = tf.summary.image("fakeA", self.fake_A_)
-        self.g_fakeB_image_sum = tf.summary.image("fakeB", self.fake_B)
+        # self.g_realA_image_sum = tf.summary.image("realA", self.real_A)
+        # self.g_realB_image_sum = tf.summary.image("realB", self.real_B)
+        self.g_fakeA_image_sum_ = tf.summary.image("fakeA", self.output_fakeA)
+        self.g_fakeB_image_sum = tf.summary.image("fakeB", self.output_fakeB)
         self.g_sum = tf.summary.merge([self.g_loss_a2b_sum, self.g_loss_b2a_sum, self.g_loss_sum,
-            self.g_realA_image_sum, self.g_fakeB_image_sum, self.g_fakeA_image_sum_, self.g_realB_image_sum])
+            self.g_fakeB_image_sum, self.g_fakeA_image_sum_])
         self.db_loss_sum = tf.summary.scalar("db_loss", self.db_loss)
         self.da_loss_sum = tf.summary.scalar("da_loss", self.da_loss)
         self.d_loss_sum = tf.summary.scalar("d_loss", self.d_loss)
@@ -115,6 +118,8 @@ class cyclegan(object):
         self.test_B = tf.placeholder(tf.float32,
                                      [None, self.image_size, self.image_size,
                                       self.output_c_dim], name='test_B')
+        self.test_A, self.test_chan_A = preprocess_lab(rgb_to_lab(self.test_A))
+        self.test_B, self.test_chan_B = preprocess_lab(rgb_to_lab(self.test_B))
         self.testB = self.generator(self.test_A, self.options, True, name="generatorA2B")
         self.testA = self.generator(self.test_B, self.options, True, name="generatorB2A")
 
@@ -219,7 +224,7 @@ class cyclegan(object):
         sample_images = np.array(sample_images).astype(np.float32)
 
         fake_A, fake_B = self.sess.run(
-            [self.fake_A, self.fake_B],
+            [self.output_fakeA, self.output_fakeB],
             feed_dict={self.real_data: sample_images}
         )
         save_images(fake_A, [self.batch_size, 1],
@@ -267,3 +272,116 @@ class cyclegan(object):
                 '..' + os.path.sep + image_path)))
             index.write("</tr>")
         index.close()
+
+
+def preprocess_lab(lab):
+    with tf.name_scope("preprocess_lab"):
+        L_chan, a_chan, b_chan = tf.unstack(lab, axis=3)
+        # L_chan: black and white with input range [0, 100]
+        # a_chan/b_chan: color channels with input range ~[-110, 110], not exact
+        # [0, 100] => [-1, 1],  ~[-110, 110] => [-1, 1]
+        return tf.stack([a_chan / 110, b_chan / 110], axis=3), L_chan
+        # return np.asarray([L_chan / 50 - 1, a_chan / 110, b_chan / 110])
+
+
+def deprocess_lab(L_chan, ab):
+    with tf.name_scope("deprocess_lab"):
+        # this is axis=3 instead of axis=2 because we process individual images but deprocess batches
+        a_chan, b_chan = tf.unstack(ab, axis=3)
+        return tf.stack([(L_chan + 1) / 2 * 100, a_chan * 110, b_chan * 110], axis=3)
+
+def check_image(image):
+    assertion = tf.assert_equal(tf.shape(image)[-1], 3, message="image must have 3 color channels")
+    with tf.control_dependencies([assertion]):
+        image = tf.identity(image)
+
+    if image.get_shape().ndims not in (3, 4):
+        raise ValueError("image must be either 3 or 4 dimensions")
+
+    # make the last dimension 3 so that you can unstack the colors
+    shape = list(image.get_shape())
+    shape[-1] = 3
+    image.set_shape(shape)
+    return image
+# based on https://github.com/torch/image/blob/9f65c30167b2048ecbe8b7befdc6b2d6d12baee9/generic/image.c
+def rgb_to_lab(srgb):
+    with tf.name_scope("rgb_to_lab"):
+        srgb = check_image(srgb)
+        srgb_pixels = tf.reshape(srgb, [-1, 3])
+
+        with tf.name_scope("srgb_to_xyz"):
+            linear_mask = tf.cast(srgb_pixels <= 0.04045, dtype=tf.float32)
+            exponential_mask = tf.cast(srgb_pixels > 0.04045, dtype=tf.float32)
+            rgb_pixels = (srgb_pixels / 12.92 * linear_mask) + (((srgb_pixels + 0.055) / 1.055) ** 2.4) * exponential_mask
+            rgb_to_xyz = tf.constant([
+                #    X        Y          Z
+                [0.412453, 0.212671, 0.019334], # R
+                [0.357580, 0.715160, 0.119193], # G
+                [0.180423, 0.072169, 0.950227], # B
+            ])
+            xyz_pixels = tf.matmul(rgb_pixels, rgb_to_xyz)
+
+        # https://en.wikipedia.org/wiki/Lab_color_space#CIELAB-CIEXYZ_conversions
+        with tf.name_scope("xyz_to_cielab"):
+            # convert to fx = f(X/Xn), fy = f(Y/Yn), fz = f(Z/Zn)
+
+            # normalize for D65 white point
+            xyz_normalized_pixels = tf.multiply(xyz_pixels, [1/0.950456, 1.0, 1/1.088754])
+
+            epsilon = 6/29
+            linear_mask = tf.cast(xyz_normalized_pixels <= (epsilon**3), dtype=tf.float32)
+            exponential_mask = tf.cast(xyz_normalized_pixels > (epsilon**3), dtype=tf.float32)
+            fxfyfz_pixels = (xyz_normalized_pixels / (3 * epsilon**2) + 4/29) * linear_mask + (xyz_normalized_pixels ** (1/3)) * exponential_mask
+
+            # convert to lab
+            fxfyfz_to_lab = tf.constant([
+                #  l       a       b
+                [  0.0,  500.0,    0.0], # fx
+                [116.0, -500.0,  200.0], # fy
+                [  0.0,    0.0, -200.0], # fz
+            ])
+            lab_pixels = tf.matmul(fxfyfz_pixels, fxfyfz_to_lab) + tf.constant([-16.0, 0.0, 0.0])
+
+        return tf.reshape(lab_pixels, tf.shape(srgb))
+
+
+def lab_to_rgb(lab):
+    with tf.name_scope("lab_to_rgb"):
+        lab = check_image(lab)
+        lab_pixels = tf.reshape(lab, [-1, 3])
+
+        # https://en.wikipedia.org/wiki/Lab_color_space#CIELAB-CIEXYZ_conversions
+        with tf.name_scope("cielab_to_xyz"):
+            # convert to fxfyfz
+            lab_to_fxfyfz = tf.constant([
+                #   fx      fy        fz
+                [1/116.0, 1/116.0,  1/116.0], # l
+                [1/500.0,     0.0,      0.0], # a
+                [    0.0,     0.0, -1/200.0], # b
+            ])
+            fxfyfz_pixels = tf.matmul(lab_pixels + tf.constant([16.0, 0.0, 0.0]), lab_to_fxfyfz)
+
+            # convert to xyz
+            epsilon = 6/29
+            linear_mask = tf.cast(fxfyfz_pixels <= epsilon, dtype=tf.float32)
+            exponential_mask = tf.cast(fxfyfz_pixels > epsilon, dtype=tf.float32)
+            xyz_pixels = (3 * epsilon**2 * (fxfyfz_pixels - 4/29)) * linear_mask + (fxfyfz_pixels ** 3) * exponential_mask
+
+            # denormalize for D65 white point
+            xyz_pixels = tf.multiply(xyz_pixels, [0.950456, 1.0, 1.088754])
+
+        with tf.name_scope("xyz_to_srgb"):
+            xyz_to_rgb = tf.constant([
+                #     r           g          b
+                [ 3.2404542, -0.9692660,  0.0556434], # x
+                [-1.5371385,  1.8760108, -0.2040259], # y
+                [-0.4985314,  0.0415560,  1.0572252], # z
+            ])
+            rgb_pixels = tf.matmul(xyz_pixels, xyz_to_rgb)
+            # avoid a slightly negative number messing up the conversion
+            rgb_pixels = tf.clip_by_value(rgb_pixels, 0.0, 1.0)
+            linear_mask = tf.cast(rgb_pixels <= 0.0031308, dtype=tf.float32)
+            exponential_mask = tf.cast(rgb_pixels > 0.0031308, dtype=tf.float32)
+            srgb_pixels = (rgb_pixels * 12.92 * linear_mask) + ((rgb_pixels ** (1/2.4) * 1.055) - 0.055) * exponential_mask
+
+        return tf.reshape(srgb_pixels, tf.shape(lab))
