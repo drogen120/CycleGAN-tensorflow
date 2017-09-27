@@ -40,11 +40,12 @@ class ImagePool(object):
 
 def load_test_data(image_path, fine_size=256):
     img = imread(image_path)
-    img = scipy.misc.imresize(img, [640, 360])
+    img = scipy.misc.imresize(img, [360, 640])
+    img = center_crop(img, fine_size, fine_size)
     img = img/127.5 - 1
     return img
 
-def load_train_data(image_path, load_size=640, fine_size=320, is_testing=False):
+def load_train_data(image_path, load_size=640, fine_size=256, is_testing=False):
     img_A = imread(image_path[0])
     img_B = imread(image_path[1])
     img_A = scipy.misc.imresize(img_A, [360, 640])
@@ -138,16 +139,23 @@ def random_crop(x, crop_h, crop_w):
     print (j,i)
     return x[j:j+crop_h, i:i+crop_w]
 
-
-def center_crop(x, crop_h, crop_w,
-                resize_h=64, resize_w=64):
-  if crop_w is None:
-    crop_w = crop_h
-  h, w = x.shape[:2]
-  j = int(round((h - crop_h)/2.))
-  i = int(round((w - crop_w)/2.))
-  return scipy.misc.imresize(
-      x[j:j+crop_h, i:i+crop_w], [resize_h, resize_w])
+def center_crop(x, crop_h, crop_w):
+    if crop_w is None:
+        crop_w = crop_h
+    h, w = x.shape[:2]
+    j = int(round((h - crop_h)/2.))
+    i = int(round((w - crop_w)/2.))
+    print (j,i)
+    return x[j:j+crop_h, i:i+crop_w]
+# def center_crop(x, crop_h, crop_w,
+#                 resize_h=64, resize_w=64):
+#   if crop_w is None:
+#     crop_w = crop_h
+#   h, w = x.shape[:2]
+#   j = int(round((h - crop_h)/2.))
+#   i = int(round((w - crop_w)/2.))
+#   return scipy.misc.imresize(
+#       x[j:j+crop_h, i:i+crop_w], [resize_h, resize_w])
 
 def transform(image, npx=64, is_crop=True, resize_w=64):
     # npx : # of pixels width/height of image
